@@ -24,8 +24,6 @@ Key Features:
 from binance.client import Client
 from binance import ThreadedWebsocketManager
 import pandas as pd
-import sys
-import time
 from datetime import datetime
 
 class Trader(): 
@@ -40,7 +38,7 @@ class Trader():
     - short_tp_deduct: Percentage to subtract from SHORT entry price for take-profit
     - short_sl_add: Percentage to add to SHORT entry price for stop-loss
     """
-    def __init__(self, symbol, bar_length, units, leverage = 5, side = "Long",
+    def __init__(self, symbol, bar_length, units, leverage = 5, side = "LONG",
                  long_entry_add = 0.4/100, short_entry_deduct = 0.4/100,
                  long_tp_add = 0.8/100, long_sl_deduct = 1.2/100,
                  short_tp_deduct = 0.8/100, short_sl_add = 1.2/100): 
@@ -88,76 +86,80 @@ class Trader():
         - Opens a SHORT position at market price  
         - Sets up price levels for next LONG entry and SHORT take-profit/stop-loss
         """
-        if self.side == "LONG":
-            # Open initial LONG position
-            order = client.futures_create_order(
-                symbol = self.symbol, 
-                side = "BUY", 
-                type = "MARKET", 
-                quantity = self.int_units,
-                positionSide = "LONG"
-            )
+        try:
+            if self.side == "LONG":
+                # Open initial LONG position
+                order = client.futures_create_order(
+                    symbol = self.symbol, 
+                    side = "BUY", 
+                    type = "MARKET", 
+                    quantity = self.int_units,
+                    positionSide = "LONG"
+                )
+                
+                # Get current market price and set up all price levels
+                ticker = client.futures_symbol_ticker(symbol=self.symbol)
+                self.long_entry = float(ticker['price'])
+                
+                # Calculate next SHORT entry (0.4% below current price)
+                self.short_entry = self.long_entry - self.short_entry_deduct * self.long_entry
+                
+                # Calculate LONG take-profit and stop-loss levels
+                self.long_tp = self.long_entry + self.long_tp_add * self.long_entry      # 0.8% above entry
+                self.long_sl = self.long_entry - self.long_sl_deduct * self.long_entry   # 1.2% below entry
+                
+                # Calculate SHORT take-profit and stop-loss levels
+                self.short_tp = self.short_entry - self.short_tp_deduct * self.short_entry # 0.8% below entry
+                self.short_sl = self.short_entry + self.short_sl_add * self.short_entry   # 1.2% above entry
+                
+                # Update position tracking
+                self.last_units = self.int_units
+                self.last_direction = "LONG"
+                
+                # Report the trade
+                self.report_trade(order, "ENTERING LONG at", self.long_entry)
+                print(f"long tp: {self.long_tp:,.2f}", f"long sl: {self.long_sl:,.2f}")
+                print(f"next short entry: {self.short_entry:,.2f}")
+                
+                #self.hedging_loop()
             
-            # Get current market price and set up all price levels
-            ticker = client.futures_symbol_ticker(symbol=self.symbol)
-            self.long_entry = float(ticker['price'])
-            
-            # Calculate next SHORT entry (0.4% below current price)
-            self.short_entry = self.long_entry - self.short_entry_deduct * self.long_entry
-            
-            # Calculate LONG take-profit and stop-loss levels
-            self.long_tp = self.long_entry + self.long_tp_add * self.long_entry      # 0.8% above entry
-            self.long_sl = self.long_entry - self.long_sl_deduct * self.long_entry   # 1.2% below entry
-            
-            # Calculate SHORT take-profit and stop-loss levels
-            self.short_tp = self.short_entry - self.short_tp_deduct * self.short_entry # 0.8% below entry
-            self.short_sl = self.short_entry + self.short_sl_add * self.short_entry   # 1.2% above entry
-            
-            # Update position tracking
-            self.last_units = self.int_units
-            self.last_direction = "LONG"
-            
-            # Report the trade
-            self.report_trade(order, "ENTERING LONG at", self.long_entry)
-            print(f"long tp: {self.long_tp:,.2f}", f"long sl: {self.long_sl:,.2f}")
-            print(f"next short entry: {self.short_entry:,.2f}")
-            
-            #self.hedging_loop()
-        
-        elif self.side == "SHORT":
-            # Open initial SHORT position
-            order = client.futures_create_order(
-                symbol = self.symbol, 
-                side = "SELL", 
-                type = "MARKET", 
-                quantity = self.int_units,
-                positionSide = "SHORT"
-            )
-            
-            # Get current market price and set up all price levels
-            ticker = client.futures_symbol_ticker(symbol=self.symbol)
-            self.short_entry = float(ticker['price'])
-            
-            # Calculate next LONG entry (0.4% above current price)
-            self.long_entry = self.short_entry + self.long_entry_add * self.short_entry
-            
-            # Calculate SHORT take-profit and stop-loss levels
-            self.short_tp = self.short_entry - self.short_tp_deduct * self.short_entry # 0.8% below entry
-            self.short_sl = self.short_entry + self.short_sl_add * self.short_entry   # 1.2% above entry
-            
-            # Calculate LONG take-profit and stop-loss levels
-            self.long_tp = self.long_entry + self.long_tp_add * self.long_entry      # 0.8% above entry
-            self.long_sl = self.long_entry - self.long_sl_deduct * self.long_entry   # 1.2% below entry
-            
-            # Update position tracking
-            self.last_units = self.int_units * -1  # Negative for SHORT position
-            self.last_direction = "SHORT"
-            
-            # Report the trade
-            self.report_trade(order, "ENTERING SHORT at", self.short_entry)
-            print(f"short tp: {self.short_tp:,.2f}", f"short sl: {self.short_sl:,.2f}")
-            print(f"next long entry: {self.long_entry:,.2f}")
-            #self.hedging_loop()
+            elif self.side == "SHORT":
+                # Open initial SHORT position
+                order = client.futures_create_order(
+                    symbol = self.symbol, 
+                    side = "SELL", 
+                    type = "MARKET", 
+                    quantity = self.int_units,
+                    positionSide = "SHORT"
+                )
+                
+                # Get current market price and set up all price levels
+                ticker = client.futures_symbol_ticker(symbol=self.symbol)
+                self.short_entry = float(ticker['price'])
+                
+                # Calculate next LONG entry (0.4% above current price)
+                self.long_entry = self.short_entry + self.long_entry_add * self.short_entry
+                
+                # Calculate SHORT take-profit and stop-loss levels
+                self.short_tp = self.short_entry - self.short_tp_deduct * self.short_entry # 0.8% below entry
+                self.short_sl = self.short_entry + self.short_sl_add * self.short_entry   # 1.2% above entry
+                
+                # Calculate LONG take-profit and stop-loss levels
+                self.long_tp = self.long_entry + self.long_tp_add * self.long_entry      # 0.8% above entry
+                self.long_sl = self.long_entry - self.long_sl_deduct * self.long_entry   # 1.2% below entry
+                
+                # Update position tracking
+                self.last_units = self.int_units * -1  # Negative for SHORT position
+                self.last_direction = "SHORT"
+                
+                # Report the trade
+                self.report_trade(order, "ENTERING SHORT at", self.short_entry)
+                print(f"short tp: {self.short_tp:,.2f}", f"short sl: {self.short_sl:,.2f}")
+                print(f"next long entry: {self.long_entry:,.2f}")
+                #self.hedging_loop()
+        except Exception as e:
+            print(f"Error in first_trade: {e}")
+            raise
 
     def hedging_loop(self):
         """
@@ -175,94 +177,98 @@ class Trader():
         
         This creates a grid-like trading pattern that can profit from price reversals.
         """
-        #print('Hedging loop started')
-        if self.last_direction == "LONG":
-            #print('Last direction is Long')
-            if self.last_units > 0:  # Currently have a LONG position
-                #print('Last units is greater than 0')
-                
-                # Check if price has dropped to SHORT entry level
-                if self.close <= (self.short_entry):
-                    # Price dropped enough to trigger SHORT entry (hedging)
-                    # Open SHORT position with double the size of current LONG position
-                    order = client.futures_create_order(
-                        symbol = self.symbol, 
-                        side = "SELL", 
-                        type = "MARKET", 
-                        quantity = abs(self.last_units*2),  # Double the position size
-                        positionSide = "SHORT"
-                    )
+        try:
+            #print('Hedging loop started')
+            if self.last_direction == "LONG":
+                #print('Last direction is Long')
+                if self.last_units > 0:  # Currently have a LONG position
+                    #print('Last units is greater than 0')
                     
-                    # Update price levels based on new SHORT entry
-                    ticker = client.futures_symbol_ticker(symbol=self.symbol)
-                    self.short_entry = float(ticker['price'])
-                    self.short_tp = self.short_entry - self.short_tp_deduct * self.short_entry
-                    self.short_sl = self.short_entry + self.short_sl_add * self.short_entry
-                    
-                    # Update position tracking (now have both LONG and SHORT)
-                    self.last_units = self.last_units*2 * -1  # Negative for SHORT
-                    self.last_direction = "SHORT"
-                    
-                    self.report_trade(order, "ENTERING SHORT at", self.short_entry)
-                    print(f"next long entry: {self.long_entry:,.2f}")
-                    #self.hedging_loop()
+                    # Check if price has dropped to SHORT entry level
+                    if self.close <= (self.short_entry):
+                        # Price dropped enough to trigger SHORT entry (hedging)
+                        # Open SHORT position with double the size of current LONG position
+                        order = client.futures_create_order(
+                            symbol = self.symbol, 
+                            side = "SELL", 
+                            type = "MARKET", 
+                            quantity = abs(self.last_units*2),  # Double the position size
+                            positionSide = "SHORT"
+                        )
+                        
+                        # Update price levels based on new SHORT entry
+                        ticker = client.futures_symbol_ticker(symbol=self.symbol)
+                        self.short_entry = float(ticker['price'])
+                        self.short_tp = self.short_entry - self.short_tp_deduct * self.short_entry
+                        self.short_sl = self.short_entry + self.short_sl_add * self.short_entry
+                        
+                        # Update position tracking (now have both LONG and SHORT)
+                        self.last_units = self.last_units*2 * -1  # Negative for SHORT
+                        self.last_direction = "SHORT"
+                        
+                        self.report_trade(order, "ENTERING SHORT at", self.short_entry)
+                        print(f"next long entry: {self.long_entry:,.2f}")
+                        #self.hedging_loop()
 
-                # Check if price has risen to LONG take-profit level
-                elif self.close >= self.long_tp:
-                    print('Close is equal to long tp')
-                    # Take profit reached - close all positions and restart
-                    self.close_all_positions()
-                    #self.report_trade(order, "All Positions Closed")
-                    self.last_units = 0
-                    self.last_direction = None
-                    self.side = "LONG"
-                    print("All positions closed, Side set to Long, Running first trade")
-                    self.first_trade()
+                    # Check if price has risen to LONG take-profit level
+                    elif self.close >= self.long_tp:
+                        print('Close is equal to long tp')
+                        # Take profit reached - close all positions and restart
+                        self.close_all_positions()
+                        #self.report_trade(order, "All Positions Closed")
+                        self.last_units = 0
+                        self.last_direction = None
+                        self.side = "LONG"
+                        print("All positions closed, Side set to Long, Running first trade")
+                        self.first_trade()
 
-        elif self.last_direction == "SHORT":
-            #print('Last direction is SHORT')
-            if self.last_units < 0:  # Currently have a SHORT position
-                #print('Last units is greater than 0')
-                
-                # Check if price has risen to LONG entry level
-                if self.close >= (self.long_entry):
-                    print('Close is equal to short entry + 400')
-                    # Price rose enough to trigger LONG entry (hedging)
-                    # Open LONG position with double the size of current SHORT position
-                    order = client.futures_create_order(
-                        symbol = self.symbol, 
-                        side = "BUY", 
-                        type = "MARKET", 
-                        quantity = abs(self.last_units*2),  # Double the position size
-                        positionSide = "LONG"
-                    )
+            elif self.last_direction == "SHORT":
+                #print('Last direction is SHORT')
+                if self.last_units < 0:  # Currently have a SHORT position
+                    #print('Last units is greater than 0')
                     
-                    # Update price levels based on new LONG entry
-                    ticker = client.futures_symbol_ticker(symbol=self.symbol)
-                    self.long_entry = float(ticker['price'])   
-                    self.long_tp = self.long_entry + self.long_tp_add * self.long_entry
-                    self.long_sl = self.long_entry - self.long_sl_deduct * self.long_entry
-                    
-                    # Update position tracking (now have both SHORT and LONG)
-                    self.last_units = self.last_units*2 * -1  # Positive for LONG
-                    self.last_direction = "LONG"
-                    
-                    self.report_trade(order, "ENTERING LONG at", self.long_entry)
-                    print(f"next short entry: {self.short_entry:,.2f}")
-                    #self.hedging_loop()
+                    # Check if price has risen to LONG entry level
+                    if self.close >= (self.long_entry):
+                        print('Close is equal to short entry + 400')
+                        # Price rose enough to trigger LONG entry (hedging)
+                        # Open LONG position with double the size of current SHORT position
+                        order = client.futures_create_order(
+                            symbol = self.symbol, 
+                            side = "BUY", 
+                            type = "MARKET", 
+                            quantity = abs(self.last_units*2),  # Double the position size
+                            positionSide = "LONG"
+                        )
+                        
+                        # Update price levels based on new LONG entry
+                        ticker = client.futures_symbol_ticker(symbol=self.symbol)
+                        self.long_entry = float(ticker['price'])   
+                        self.long_tp = self.long_entry + self.long_tp_add * self.long_entry
+                        self.long_sl = self.long_entry - self.long_sl_deduct * self.long_entry
+                        
+                        # Update position tracking (now have both SHORT and LONG)
+                        self.last_units = self.last_units*2 * -1  # Positive for LONG
+                        self.last_direction = "LONG"
+                        
+                        self.report_trade(order, "ENTERING LONG at", self.long_entry)
+                        print(f"next short entry: {self.short_entry:,.2f}")
+                        #self.hedging_loop()
 
-                # Check if price has dropped to SHORT take-profit level
-                elif self.close <= self.short_tp:
-                    print('Close is equal to short tp')
-                    # Take profit reached - close all positions and restart
-                    self.close_all_positions()
-                    print('Closing long position')
-                    
-                    self.last_units = 0
-                    self.last_direction = None
-                    self.side = "SHORT"
-                    print("All positions closed, Side set to Short, Running first trade")
-                    self.first_trade()
+                    # Check if price has dropped to SHORT take-profit level
+                    elif self.close <= self.short_tp:
+                        print('Close is equal to short tp')
+                        # Take profit reached - close all positions and restart
+                        self.close_all_positions()
+                        print('Closing long position')
+                        
+                        self.last_units = 0
+                        self.last_direction = None
+                        self.side = "SHORT"
+                        print("All positions closed, Side set to Short, Running first trade")
+                        self.first_trade()
+        except Exception as e:
+            print(f"Error in hedging_loop: {e}")
+            # Don't raise here to prevent WebSocket from crashing
 
     def close_all_positions(self):
         """
@@ -273,39 +279,43 @@ class Trader():
         2. Identifies which positions are open (LONG and/or SHORT)
         3. Closes each position with the opposite order type
         """
-        # Get current position info from Binance
-        positions = client.futures_position_information(symbol=self.symbol)
-        
-        for pos in positions:
-            type = pos["positionSide"]  # "LONG" or "SHORT"
-            amt = float(pos["positionAmt"])  # Position size (positive for LONG, negative for SHORT)
+        try:
+            # Get current position info from Binance
+            positions = client.futures_position_information(symbol=self.symbol)
+            
+            for pos in positions:
+                type = pos["positionSide"]  # "LONG" or "SHORT"
+                amt = float(pos["positionAmt"])  # Position size (positive for LONG, negative for SHORT)
 
-            if amt == 0:
-                continue  # Skip if no open position on this side
+                if amt == 0:
+                    continue  # Skip if no open position on this side
 
-            qty = abs(amt)  # Absolute quantity to close
+                qty = abs(amt)  # Absolute quantity to close
 
-            if type == "LONG" and amt > 0:
-                # Close LONG position with SELL order
-                order = client.futures_create_order(
-                    symbol=self.symbol,
-                    side="SELL",
-                    type="MARKET",
-                    quantity=qty,
-                    positionSide="LONG"
-                )
-                print(f"Closed LONG position of {qty}")
+                if type == "LONG" and amt > 0:
+                    # Close LONG position with SELL order
+                    order = client.futures_create_order(
+                        symbol=self.symbol,
+                        side="SELL",
+                        type="MARKET",
+                        quantity=qty,
+                        positionSide="LONG"
+                    )
+                    print(f"Closed LONG position of {qty}")
 
-            elif type == "SHORT" and amt < 0:
-                # Close SHORT position with BUY order
-                order = client.futures_create_order(
-                    symbol=self.symbol,
-                    side="BUY",
-                    type="MARKET",
-                    quantity=qty,
-                    positionSide="SHORT"
-                )
-                print(f"Closed SHORT position of {qty}")
+                elif type == "SHORT" and amt < 0:
+                    # Close SHORT position with BUY order
+                    order = client.futures_create_order(
+                        symbol=self.symbol,
+                        side="BUY",
+                        type="MARKET",
+                        quantity=qty,
+                        positionSide="SHORT"
+                    )
+                    print(f"Closed SHORT position of {qty}")
+        except Exception as e:
+            print(f"Error in close_all_positions: {e}")
+            raise
 
 
     def report_trade(self, order, direction, price):
@@ -364,25 +374,44 @@ class Trader():
         Args:
             msg: WebSocket message containing price data
         """
-        # Extract timestamp and closing price from WebSocket message
-        event_time = pd.to_datetime(msg["E"], unit = "ms")  # Event time
-        close   = float(msg["k"]["c"])  # Closing price
-        self.close = close
+        try:
+            # Extract timestamp and closing price from WebSocket message
+            event_time = pd.to_datetime(msg["E"], unit = "ms")  # Event time
+            close   = float(msg["k"]["c"])  # Closing price
+            self.close = close
 
-        # Optional: Display real-time price updates (commented out)
-        #sys.stdout.write(f"\rTime: {event_time} | Price: ${close:,.2f}")
-        #sys.stdout.flush()
-        
-        # print out
-        #print("\rTime: {} | Price: ${:,.2f}".format(event_time, close), end='', flush=True)
+            # Optional: Display real-time price updates (commented out)
+            #sys.stdout.write(f"\rTime: {event_time} | Price: ${close:,.2f}")
+            #sys.stdout.flush()
+            
+            # print out
+            #print("\rTime: {} | Price: ${:,.2f}".format(event_time, close), end='', flush=True)
 
-        # Trigger hedging logic on each price update
-        self.hedging_loop()
+            # Trigger hedging logic on each price update
+            self.hedging_loop()
+        except Exception as e:
+            print(f"Error in stream_price: {e}")
+            # Don't raise here to prevent WebSocket from crashing
 
 if __name__ == "__main__": 
+    # Load environment variables
+    import os
+    from dotenv import load_dotenv
+    
+    # Load .env file
+    load_dotenv()
+    
     # Binance API credentials (TESTNET - for testing only)
-    api_key = "1f0a6f4125206e61b9d0a8c4bd27e2deea14d1cbbcc264b50f851fd41ab3634e"
-    secret_key = "f1874638cf02d1708c66aa86ac04c5daff2725b90c178b9ec6399d1939db40e8"
+    api_key = os.getenv("BINANCE_API_KEY")
+    secret_key = os.getenv("BINANCE_SECRET_KEY")
+    
+    # Check if API keys are loaded
+    if not api_key or not secret_key:
+        print("Error: API keys not found in environment variables.")
+        print("Please create a .env file with your Binance API credentials:")
+        print("BINANCE_API_KEY=your_api_key_here")
+        print("BINANCE_SECRET_KEY=your_secret_key_here")
+        exit(1)
 
     # Initialize Binance client with testnet
     client = Client(api_key=api_key, api_secret=secret_key, testnet=True)

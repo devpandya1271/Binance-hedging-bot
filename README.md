@@ -132,15 +132,27 @@ Maximum Daily Loss: 5%
 
 ### 1. Prerequisites
 ```bash
-pip install python-binance pandas
+pip install -r requirements.txt
 ```
 
-### 2. Binance Testnet Setup
+### 2. Environment Setup
+1. Copy the example environment file:
+   ```bash
+   cp env_example.txt .env
+   ```
+
+2. Edit the `.env` file with your Binance API credentials:
+   ```
+   BINANCE_API_KEY=your_api_key_here
+   BINANCE_SECRET_KEY=your_secret_key_here
+   ```
+
+### 3. Binance Testnet Setup
 1. Create account at [Binance Testnet](https://testnet.binance.vision/)
 2. Generate API keys
 3. Fund testnet account with test BTC
 
-### 3. Configuration
+### 4. Configuration
 ```python
 # Trading parameters (modify these)
 symbol = "BTCUSDT"                    # Trading pair
@@ -155,7 +167,7 @@ long_tp_add = 0.8/100                # 0.8% take profit
 short_tp_deduct = 0.8/100            # 0.8% take profit
 ```
 
-### 4. Running the Bot
+### 5. Running the Bot
 ```bash
 python main.py
 ```
@@ -174,6 +186,21 @@ python main.py
 - **Risky**: High leverage can amplify losses
 - **Market Dependent**: Performance varies with market conditions
 - **Technical**: Requires reliable internet and system uptime
+
+## Security Best Practices
+
+### API Key Security
+- ✅ Use environment variables (`.env` file)
+- ✅ Never commit API keys to version control
+- ✅ Use testnet API keys for development
+- ✅ Regularly rotate API keys
+- ✅ Set appropriate API key permissions
+
+### Code Security
+- ✅ Keep dependencies updated
+- ✅ Use virtual environments
+- ✅ Follow secure coding practices
+- ✅ Review code regularly
 
 ## Performance Monitoring
 
@@ -223,15 +250,20 @@ symbol = "DOTUSDT"                    # Polkadot
 
 **1. API Connection Errors**
 - Check internet connection
-- Verify API keys are correct
+- Verify API keys are correct in `.env` file
 - Ensure testnet URL is used
 
-**2. Position Not Opening**
+**2. Environment Variable Errors**
+- Make sure `.env` file exists
+- Check that API keys are properly set
+- Verify `python-dotenv` is installed
+
+**3. Position Not Opening**
 - Check account balance
 - Verify leverage settings
 - Ensure dual-side position mode is enabled
 
-**3. Unexpected Behavior**
+**4. Unexpected Behavior**
 - Review strategy parameters
 - Check market conditions
 - Monitor position tracking variables
@@ -272,4 +304,4 @@ Uncomment debug prints in the code:
 
 ---
 
-**Remember: The best strategy is the one you understand and can stick to consistently. Always prioritize risk management over potential profits.**
+**Remember: The best strategy is the one you understand and can stick to consistently. Always prioritize risk management over potential profits.** 
