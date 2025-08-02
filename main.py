@@ -38,19 +38,20 @@ class Trader():
     - short_tp_deduct: Percentage to subtract from SHORT entry price for take-profit
     - short_sl_add: Percentage to add to SHORT entry price for stop-loss
     """
-    def __init__(self, symbol, bar_length, units, leverage = 5, side = "LONG",
+    def __init__(self, symbol, bar_length, leverage = 5, side = "LONG",
                  long_entry_add = 0.4/100, short_entry_deduct = 0.4/100,
                  long_tp_add = 0.8/100, long_sl_deduct = 1.2/100,
-                 short_tp_deduct = 0.8/100, short_sl_add = 1.2/100): 
+                 short_tp_deduct = 0.8/100, short_sl_add = 1.2/100,
+                 risk = "High"): 
         # Trading parameters
         self.symbol = symbol                    # Trading pair (e.g., "BTCUSDT")
         self.bar_length = bar_length           # Timeframe for price data (e.g., "1m")
-        self.base_units = units                # Initial position size
-        self.int_units = units                 # Current position size (can change during trading)
+        self.base_units = 0                    # Initial position size
+        self.int_units = 0                     # Current position size (can change during trading)
         self.leverage = leverage               # Leverage for futures trading
         self.cum_profits = 0                  # Cumulative profits (not currently used)
         self.side = side                       # Initial side: "LONG" or "SHORT"
-        
+        self.risk = risk                       # Risk level: "Low", "Medium", "High"
         # Current market price
         self.close = 0.0                       # Latest closing price
         
@@ -270,6 +271,35 @@ class Trader():
             print(f"Error in hedging_loop: {e}")
             # Don't raise here to prevent WebSocket from crashing
 
+    def get_initial_units(self):
+        if self.risk == "Low":
+            max_trade = 10
+            margin = client.get_asset_balance(asset = "USDT")
+            margin = float(margin['free'])
+            margin = margin * 0.9 # 10% buffer For Fees
+            initial_margin = margin / (2**max_trade - 1)
+            self.int_units = initial_margin / self.close
+            print(f"Initial units: {self.int_units}")
+        
+        elif self.risk == "Medium":
+            max_trade = 8
+            margin = client.get_asset_balance(asset = "USDT")
+            margin = float(margin['free'])
+            margin = margin * 0.9 # 10% buffer For Fees
+            initial_margin = margin / (2**max_trade - 1)
+            self.int_units = initial_margin / self.close
+            print(f"Initial units: {self.int_units}")
+        
+        elif self.risk == "High":
+            max_trade = 6
+            margin = client.get_asset_balance(asset = "USDT")
+            margin = float(margin['free'])
+            margin = margin * 0.9 # 10% buffer For Fees
+            initial_margin = margin / (2**max_trade - 1)
+            self.int_units = initial_margin / self.close
+            print(f"Initial units: {self.int_units}")
+
+
     def close_all_positions(self):
         """
         Closes all open positions (both LONG and SHORT) at market price.
@@ -354,7 +384,8 @@ class Trader():
         except Exception as e:
             print(f"Error checking/setting position mode: {e}")
         
-        # Execute first trade to start the strategy
+        # Calculate initial units and execute first trade to start the strategy
+        self.get_initial_units()
         self.first_trade()
         
         # Start WebSocket connection for real-time price updates
@@ -416,7 +447,8 @@ if __name__ == "__main__":
     # Initialize Binance client with testnet
     client = Client(api_key=api_key, api_secret=secret_key, testnet=True)
     client.FUTURES_URL = 'https://testnet.binancefuture.com'
-    
+
+
     # Trading parameters
     symbol = "BTCUSDT"                    # Trading pair
     long_entry_add = 0.4/100             # 0.4% - distance for next LONG entry
@@ -426,16 +458,20 @@ if __name__ == "__main__":
     short_tp_deduct = 0.8/100            # 0.8% - SHORT take-profit distance
     short_sl_add = 1.2/100               # 1.2% - SHORT stop-loss distance
     bar_length = "1m"                     # 1-minute candles for price updates
-    initial_units = 0.3                   # Initial position size (0.3 BTC)
     leverage = 50                         # 50x leverage
     side = "LONG"                         # Start with LONG position
+    risk = "High"                         # Risk level: "Low", "Medium", "High"
+
+    # Close ALL Open Positions
+    client.futures_close_position(symbol = symbol)
     
 
     # Create and start the trading bot
     trader = Trader(symbol = symbol, bar_length = bar_length,
-                        units = initial_units, leverage = leverage, side = side,
+                        leverage = leverage, side = side,
                         long_entry_add = long_entry_add, short_entry_deduct = short_entry_deduct,
                         long_tp_add = long_tp_add, long_sl_deduct = long_sl_deduct,
-                        short_tp_deduct = short_tp_deduct, short_sl_add = short_sl_add)
+                        short_tp_deduct = short_tp_deduct, short_sl_add = short_sl_add,
+                        risk = risk)
 
     trader.start_trading()
