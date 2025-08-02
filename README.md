@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a grid-based hedging strategy for cryptocurrency futures trading on Binance. The strategy implements an automated trading system that can profit from price reversals by creating hedged positions.
+This is a grid-based hedging strategy for cryptocurrency futures trading on Binance. The strategy implements an automated trading system that can profit from price reversals by creating hedged positions with dynamic position sizing based on risk levels.
 
 ## ⚠️ Important Disclaimer
 
@@ -18,16 +18,17 @@ This is a grid-based hedging strategy for cryptocurrency futures trading on Bina
 ### Core Concept
 The strategy operates on a **grid-based hedging principle**:
 
-1. **Initial Position**: Opens either a LONG or SHORT position
-2. **Hedging Trigger**: When price moves 0.4% against the current position, opens an opposite position
-3. **Position Management**: Maintains both LONG and SHORT positions simultaneously
-4. **Profit Taking**: Closes all positions when price reaches take-profit levels (0.8%)
-5. **Cycle Restart**: Begins a new cycle after position closure
+1. **Risk Assessment**: Calculates position size based on account balance and risk level
+2. **Initial Position**: Opens either a LONG or SHORT position with calculated size
+3. **Hedging Trigger**: When price moves 0.4% against the current position, opens an opposite position
+4. **Position Management**: Maintains both LONG and SHORT positions simultaneously
+5. **Profit Taking**: Closes all positions when price reaches take-profit levels (0.8%)
+6. **Cycle Restart**: Begins a new cycle after position closure
 
 ### Strategy Flow
 
 ```
-Start → Open Initial Position (LONG/SHORT)
+Start → Calculate Position Size → Open Initial Position (LONG/SHORT)
   ↓
 Price moves 0.4% against position
   ↓
@@ -49,84 +50,44 @@ Restart cycle
 | Stop Loss | 1.2% | Emergency stop loss (currently unused) |
 | Leverage | 50x | Position leverage multiplier |
 
-## Risk Management Guidelines
+## Risk Management System
 
-### 1. Capital Allocation
-- **Never risk more than 1-2% of total capital per trade**
-- **Recommended maximum: 5% of capital in active positions**
-- **Keep 80-90% of capital in reserve for emergencies**
+### Dynamic Position Sizing
+The bot now implements a **risk-based position sizing system** that automatically calculates the optimal position size based on your account balance and selected risk level.
 
-### 2. Position Sizing Formula
+### Risk Levels
+
+#### 🟢 Low Risk
+- **Max Trades**: 10 levels
+- **Account Usage**: ~90% of available balance
+- **Safety Buffer**: 10% for fees
+- **Recommended For**: Beginners, conservative traders
+
+#### 🟡 Medium Risk  
+- **Max Trades**: 8 levels
+- **Account Usage**: ~90% of available balance
+- **Safety Buffer**: 10% for fees
+- **Recommended For**: Experienced traders
+
+#### 🔴 High Risk
+- **Max Trades**: 6 levels
+- **Account Usage**: ~90% of available balance
+- **Safety Buffer**: 10% for fees
+- **Recommended For**: Advanced traders only
+
+### Position Size Calculation Formula
 ```
-Position Size = (Account Balance × Risk Per Trade) ÷ (Leverage × Stop Loss Distance)
-```
-
-**Example:**
-- Account Balance: $10,000
-- Risk Per Trade: 1% ($100)
-- Leverage: 50x
-- Stop Loss: 1.2%
-
-```
-Position Size = $100 ÷ (50 × 0.012) = $100 ÷ 0.6 = $166.67
-```
-
-### 3. Risk Management Rules
-
-#### Before Trading:
-- ✅ Test on Binance Testnet first
-- ✅ Start with small position sizes
-- ✅ Set maximum daily loss limits
-- ✅ Have emergency stop procedures
-
-#### During Trading:
-- ✅ Monitor position exposure continuously
-- ✅ Don't increase position sizes during losses
-- ✅ Have a maximum drawdown limit (e.g., 10%)
-- ✅ Keep detailed trading logs
-
-#### Emergency Procedures:
-- ❌ Never panic sell
-- ❌ Don't override automated systems manually
-- ❌ Don't increase leverage to recover losses
-
-### 4. Market Conditions to Avoid
-
-**High Volatility Periods:**
-- Major news events
-- Market crashes
-- High-impact economic releases
-
-**Low Liquidity:**
-- Low volume periods
-- Thin order books
-- Weekend trading (for some pairs)
-
-## Position Sizing Recommendations
-
-### Conservative Approach (Recommended for Beginners)
-```
-Initial Position Size = 0.1 BTC (or smaller)
-Account Size: $5,000+
-Risk Per Trade: 0.5%
-Maximum Daily Loss: 2%
+Available Balance = USDT Balance × 0.9 (10% buffer for fees)
+Initial Margin = Available Balance ÷ (2^max_trades - 1)
+Position Size = Initial Margin ÷ Current Price
 ```
 
-### Moderate Approach (Experienced Traders)
-```
-Initial Position Size = 0.3 BTC
-Account Size: $10,000+
-Risk Per Trade: 1%
-Maximum Daily Loss: 3%
-```
-
-### Aggressive Approach (Advanced Traders Only)
-```
-Initial Position Size = 0.5 BTC+
-Account Size: $20,000+
-Risk Per Trade: 1.5%
-Maximum Daily Loss: 5%
-```
+**Example (High Risk):**
+- USDT Balance: $10,000
+- Available Balance: $9,000 (after 10% buffer)
+- Max Trades: 6 levels
+- Initial Margin: $9,000 ÷ (2^6 - 1) = $9,000 ÷ 63 = $142.86
+- Position Size: $142.86 ÷ $50,000 = 0.00286 BTC
 
 ## Setup Instructions
 
@@ -150,15 +111,15 @@ pip install -r requirements.txt
 ### 3. Binance Testnet Setup
 1. Create account at [Binance Testnet](https://testnet.binance.vision/)
 2. Generate API keys
-3. Fund testnet account with test BTC
+3. Fund testnet account with test USDT
 
 ### 4. Configuration
 ```python
 # Trading parameters (modify these)
 symbol = "BTCUSDT"                    # Trading pair
-initial_units = 0.1                   # Start small!
 leverage = 50                         # Leverage multiplier
 side = "LONG"                         # Initial direction
+risk = "High"                         # Risk level: "Low", "Medium", "High"
 
 # Strategy parameters
 long_entry_add = 0.4/100             # 0.4% entry distance
@@ -172,11 +133,74 @@ short_tp_deduct = 0.8/100            # 0.8% take profit
 python main.py
 ```
 
+**Note**: The bot will automatically close any existing positions before starting the strategy.
+
+## Risk Management Guidelines
+
+### 1. Capital Allocation
+- **Never risk more than 1-2% of total capital per trade**
+- **Recommended maximum: 5% of capital in active positions**
+- **Keep 80-90% of capital in reserve for emergencies**
+
+### 2. Risk Level Selection
+
+#### Conservative Approach (Low Risk)
+```python
+risk = "Low"
+# Recommended for: Beginners, small accounts
+# Account Size: $1,000+
+# Max Exposure: ~2% of account
+```
+
+#### Moderate Approach (Medium Risk)
+```python
+risk = "Medium"
+# Recommended for: Experienced traders
+# Account Size: $5,000+
+# Max Exposure: ~4% of account
+```
+
+#### Aggressive Approach (High Risk)
+```python
+risk = "High"
+# Recommended for: Advanced traders only
+# Account Size: $10,000+
+# Max Exposure: ~6% of account
+```
+
+### 3. Risk Management Rules
+
+#### Before Trading:
+- ✅ Test on Binance Testnet first
+- ✅ Start with Low risk level
+- ✅ Set maximum daily loss limits
+- ✅ Have emergency stop procedures
+
+#### During Trading:
+- ✅ Monitor position exposure continuously
+- ✅ Don't increase risk levels during losses
+- ✅ Have a maximum drawdown limit (e.g., 10%)
+- ✅ Keep detailed trading logs
+
+#### Emergency Procedures:
+- ❌ Never panic sell
+- ❌ Don't override automated systems manually
+- ❌ Don't increase leverage to recover losses
+
+### 4. Market Conditions to Avoid
+
+**Low Liquidity:**
+- Low volume periods
+- Thin order books
+- Weekend trading (for some pairs)
+
 ## Strategy Advantages
 
 ### ✅ Pros
 - **Automated**: No emotional trading decisions
 - **Hedged**: Reduces directional risk
+- **Dynamic Sizing**: Automatically calculates optimal position size
+- **Risk-Based**: Multiple risk levels for different trader types
 - **Scalable**: Can handle multiple positions
 - **Backtested**: Can be tested on historical data
 - **Real-time**: Responds to market changes instantly
@@ -210,6 +234,7 @@ python main.py
 3. **Maximum Drawdown**: Largest peak-to-trough decline
 4. **Sharpe Ratio**: Risk-adjusted returns
 5. **Position Exposure**: Total open position value
+6. **Risk-Adjusted Returns**: Performance relative to risk level
 
 ### Recommended Monitoring Tools
 - Trading journal (Excel/Google Sheets)
@@ -262,11 +287,13 @@ symbol = "DOTUSDT"                    # Polkadot
 - Check account balance
 - Verify leverage settings
 - Ensure dual-side position mode is enabled
+- Check if position size calculation is working
 
 **4. Unexpected Behavior**
 - Review strategy parameters
 - Check market conditions
 - Monitor position tracking variables
+- Verify risk level selection
 
 ### Debug Mode
 Uncomment debug prints in the code:
@@ -304,4 +331,4 @@ Uncomment debug prints in the code:
 
 ---
 
-**Remember: The best strategy is the one you understand and can stick to consistently. Always prioritize risk management over potential profits.** 
+**Remember: The best strategy is the one you understand and can stick to consistently. Always prioritize risk management over potential profits. Start with Low risk and gradually increase as you gain experience.** 
