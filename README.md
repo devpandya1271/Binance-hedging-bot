@@ -135,6 +135,20 @@ python main.py
 
 **Note**: The bot will automatically close any existing positions before starting the strategy.
 
+### 6. Real-Time Trading Display
+
+When running, the bot displays real-time trading information in the terminal. Here's what you'll see:
+
+![Trading Bot Terminal Output](trading_bot_output.png)
+
+**Key Information Displayed:**
+- **Trade Entries**: Price, order ID, and quantity for each position
+- **Price Levels**: Take-profit and stop-loss levels for current positions
+- **Next Entry**: Target price for the next opposite position
+- **Real-Time Updates**: Timestamp and current market price
+- **Trade Outcomes**: Reason for position closure (take-profit, stop-loss, or entry trigger)
+- **System Status**: Position closure confirmations and strategy restarts
+
 ## Risk Management Guidelines
 
 ### 1. Capital Allocation
@@ -331,4 +345,4 @@ Uncomment debug prints in the code:
 
 ---
 
-**Remember: The best strategy is the one you understand and can stick to consistently. Always prioritize risk management over potential profits. Start with Low risk and gradually increase as you gain experience.** 
+**Remember: The best strategy is the one you understand and can stick to consistently. Always prioritize risk management over potential profits. Start with Low risk and gradually increase as you gain experience.**
